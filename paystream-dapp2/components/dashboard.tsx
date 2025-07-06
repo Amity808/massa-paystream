@@ -5,101 +5,60 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowUpRight, ArrowDownLeft, Plus, RefreshCw, Wallet, TrendingUp, Clock } from "lucide-react"
 import type { Stream } from "@/types/stream"
 import { StreamCard } from "./stream-card"
 import { StreamDetailsModal } from "./stream-details-modal"
 import { CreateStreamForm } from "./create-stream-form"
-import { massaClient } from "@/lib/massa-client"
 import { useWallet } from "@/contexts/wallet-context"
-import { toast } from "@/hooks/use-toast"
-import { PAYSTREAM_CONTRACT_ADDRESS } from "@/contract"
-import { bytesToStr, SmartContract, JsonRpcProvider } from "@massalabs/massa-web3";
-import { StreamCardIncoming } from "./incoming-stream"
 import { useStreams } from "@/hooks/use-streams"
-
+import { StreamCardIncoming } from "./incoming-stream"
 
 export function Dashboard() {
   const { address, isConnected } = useWallet()
-  const [payerStreams, setPayerStreams] = useState<Stream[]>([])
-  const [payeeStreams, setPayeeStreams] = useState<Stream[]>([])
-  const [streamLength, setStreamLength] = useState<number>(0)
-  const [isLoading, setIsLoading] = useState(true)
   const [selectedStream, setSelectedStream] = useState<Stream | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
-      const { streams } = useStreams()
-
-
-  const provider = JsonRpcProvider.buildnet();
-  const payStreamContract = new SmartContract(provider, PAYSTREAM_CONTRACT_ADDRESS);
-
-
-
-
-  const loadStreams = async () => {
-    if (!address || !isConnected) return
-
-    setIsLoading(true)
-    try {
-      // Call getStreamLength from the contract
-      const streamLengthResult = await payStreamContract.read('getStreamLength');
-      const streamLengthStr = bytesToStr(streamLengthResult.value);
-      const streamLengthNum = parseInt(streamLengthStr);
-      setStreamLength(streamLengthNum);
-
-      console.log("Stream length result:", streamLengthStr, "as number:", streamLengthNum);
-
-      const { payerStreams: pStreams, payeeStreams: peeStreams } = await massaClient.getUserStreams(address)
-      setPayerStreams(pStreams)
-      setPayeeStreams(peeStreams)
-    } catch (error) {
-      console.error("Failed to load streams:", error)
-      toast({
-        title: "Failed to Load Streams",
-        description: "Could not fetch your payment streams",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadStreams()
-  }, [address, isConnected])
+  const { streams, isFetching, refetch } = useStreams()
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
     if (!isConnected) return
 
-    const interval = setInterval(loadStreams, 30000)
+    const interval = setInterval(() => {
+      refetch()
+    }, 30000)
     return () => clearInterval(interval)
-  }, [isConnected])
+  }, [isConnected, refetch])
 
   const formatAmount = (amount: string) => {
     return (Number.parseFloat(amount) / 1e9).toFixed(4)
   }
 
   const getTotalStats = () => {
-    const totalOutgoing = payerStreams.reduce((sum, stream) => sum + Number.parseFloat(stream.totalPaid), 0)
-    const totalIncoming = payeeStreams.reduce((sum, stream) => sum + Number.parseFloat(stream.totalPaid), 0)
-    const activeOutgoing = payerStreams.filter((s) => s.status === "active").length
-    const activeIncoming = payeeStreams.filter((s) => s.status === "active").length
+    const userOutgoingStreams = streams.filter(stream => stream.payer === address)
+    const userIncomingStreams = streams.filter(stream => stream.payee === address)
+
+    const totalOutgoing = userOutgoingStreams.reduce((sum, stream) => sum + Number.parseFloat(stream.totalPaid), 0)
+    const totalIncoming = userIncomingStreams.reduce((sum, stream) => sum + Number.parseFloat(stream.totalPaid), 0)
+    const activeOutgoing = userOutgoingStreams.filter((s) => s.status === "active").length
+    const activeIncoming = userIncomingStreams.filter((s) => s.status === "active").length
 
     return {
       totalOutgoing: formatAmount(totalOutgoing.toString()),
       totalIncoming: formatAmount(totalIncoming.toString()),
       activeOutgoing,
       activeIncoming,
-      totalStreams: payerStreams.length + payeeStreams.length,
+      totalStreams: userOutgoingStreams.length + userIncomingStreams.length,
     }
   }
 
   const getDuePayments = () => {
     const now = Math.floor(Date.now() / 1000)
-    return [...payerStreams, ...payeeStreams].filter(
+    const userStreams = streams.filter(stream =>
+      stream.payer === address || stream.payee === address
+    )
+    return userStreams.filter(
       (stream) => stream.status === "active" && stream.nextPayment <= now,
     )
   }
@@ -130,8 +89,8 @@ export function Dashboard() {
           <p className="text-muted-foreground">Manage your recurring payment streams</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={loadStreams} disabled={isLoading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+          <Button variant="outline" onClick={refetch} disabled={isFetching}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           <Button onClick={() => setShowCreateForm(true)}>
@@ -186,17 +145,6 @@ export function Dashboard() {
             <p className="text-xs text-muted-foreground">Payments ready to execute</p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Streams (Contract)</CardTitle>
-            <TrendingUp className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{streams.length}</div>
-            <p className="text-xs text-muted-foreground">Streams on blockchain</p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Due Payments Alert */}
@@ -232,8 +180,8 @@ export function Dashboard() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="outgoing">My Streams ({streams.length})</TabsTrigger>
-          <TabsTrigger value="incoming">Incoming </TabsTrigger>
+          <TabsTrigger value="outgoing">My Streams ({streams.filter(s => s.payer === address).length})</TabsTrigger>
+          <TabsTrigger value="incoming">Incoming ({streams.filter(s => s.payee === address).length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -247,10 +195,10 @@ export function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-              <StreamCard
-                      onUpdate={loadStreams}
-                      onViewDetails={setSelectedStream}
-                    />
+                <StreamCard
+                  onUpdate={refetch}
+                  onViewDetails={setSelectedStream}
+                />
               </CardContent>
             </Card>
 
@@ -263,12 +211,11 @@ export function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-              <StreamCardIncoming
-                      setShowCreateForm={setShowCreateForm}
-                      onUpdate={loadStreams}
-                      onViewDetails={setSelectedStream}
-                    />
-            
+                <StreamCardIncoming
+                  setShowCreateForm={setShowCreateForm}
+                  onUpdate={refetch}
+                  onViewDetails={setSelectedStream}
+                />
               </CardContent>
             </Card>
           </div>
@@ -284,14 +231,12 @@ export function Dashboard() {
               <CardDescription>Streams where you are the payer</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  
-                  <StreamCard
-                      onUpdate={loadStreams}
-                      onViewDetails={setSelectedStream}
-                    />
-                </div>
-              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <StreamCard
+                  onUpdate={refetch}
+                  onViewDetails={setSelectedStream}
+                />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -306,11 +251,11 @@ export function Dashboard() {
               <CardDescription>Streams where you are the recipient</CardDescription>
             </CardHeader>
             <CardContent>
-            <StreamCardIncoming
-                      setShowCreateForm={setShowCreateForm}
-                      onUpdate={loadStreams}
-                      onViewDetails={setSelectedStream}
-                    />
+              <StreamCardIncoming
+                setShowCreateForm={setShowCreateForm}
+                onUpdate={refetch}
+                onViewDetails={setSelectedStream}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -321,7 +266,7 @@ export function Dashboard() {
         stream={selectedStream}
         isOpen={!!selectedStream}
         onClose={() => setSelectedStream(null)}
-        userRole={selectedStream && payerStreams.find((s) => s.id === selectedStream.id) ? "payer" : "payee"}
+        userRole={selectedStream && streams.find((s: Stream) => s.id === selectedStream.id)?.payer === address ? "payer" : "payee"}
       />
 
       {/* Create Stream Modal */}
@@ -338,7 +283,7 @@ export function Dashboard() {
               <CreateStreamForm
                 onSuccess={() => {
                   setShowCreateForm(false)
-                  loadStreams()
+                  refetch()
                 }}
               />
             </div>

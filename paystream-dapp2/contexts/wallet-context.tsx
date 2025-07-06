@@ -12,6 +12,7 @@ interface WalletContextType extends WalletState {
   connect: () => Promise<void>
   disconnect: () => Promise<void>
   provider?: any;
+  isConnecting?: boolean;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
