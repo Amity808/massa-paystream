@@ -1,151 +1,31 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Play, Pause, Square, Clock, User, Coins, Calendar, MoreHorizontal, Eye, Loader2 } from "lucide-react"
+import { Play, Pause, Square, User, Coins, Calendar, MoreHorizontal, Eye, Loader2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import type { Stream } from "@/types/stream"
 import { toast } from "@/hooks/use-toast"
 import { useWallet } from "@/contexts/wallet-context"
 import { PAYSTREAM_CONTRACT_ADDRESS } from "@/contract"
-import { SmartContract, Args, bytesToStr } from "@massalabs/massa-web3"
+import { SmartContract, Args } from "@massalabs/massa-web3"
+import { ArrowUpRight, ArrowDownLeft, Plus, RefreshCw, Wallet, TrendingUp, Clock } from "lucide-react"
+import { useStreams } from "@/hooks/use-streams"
 
 interface StreamCardProps {
-  userRole: "payer" | "payee"
+  
   onUpdate?: () => void
   onViewDetails?: (stream: Stream) => void
+  setShowCreateForm?: (show: boolean) => void
 }
 
-export function StreamCard({ userRole, onUpdate, onViewDetails }: StreamCardProps) {
-  const { address, provider } = useWallet()
+export function StreamCard({ onUpdate, onViewDetails, setShowCreateForm }: StreamCardProps) {
+  const { provider, address } = useWallet()
   const [isLoading, setIsLoading] = useState<string | null>(null)
-  const [streams, setStreams] = useState<Stream[]>([])
-  const [isFetching, setIsFetching] = useState(true)
+  const { streams, isFetching, refetch } = useStreams()
 
-  // Fetch all stream data
-  const fetchStreamData = async () => {
-
-    if (!provider) {
-      console.log("No provider available")
-      setIsFetching(false)
-      return
-    }
-
-    try {
-      setIsFetching(true)
-      console.log("Creating SmartContract instance...")
-
-      // Create smart contract instance
-      const payStreamContract = new SmartContract(provider, PAYSTREAM_CONTRACT_ADDRESS)
-      console.log("SmartContract created, getting stream length...")
-
-      // Get total number of streams
-      const streamLengthResult = await payStreamContract.read('getStreamLength')
-      const streamLengthStr = bytesToStr(streamLengthResult.value)
-      const streamLengthNum = parseInt(streamLengthStr)
-      console.log("Total streams:", streamLengthNum)
-
-      const allStreams: Stream[] = []
-      // const newSt = 3
-
-      // Loop through all streams
-      console.log("Starting loop, total streams:", streamLengthNum)
-      for (let i = 0; i < streamLengthNum; i++) {
-        console.log(`Processing stream ${i}/${streamLengthNum}`)
-        try {
-          // Prepare arguments for getStreamInfo function
-          const args = new Args().addString(i.toString())
-          console.log(i, "stream ID")
-          // Call the smart contract to get stream info
-          const result = await payStreamContract.read('getStreamInfo', args)
-          const streamData = new Args(result.value)
-          console.log(streamData, "data")
-
-          // Check if the stream data is valid (not empty)
-          if (streamData.serialized.length === 0) {
-            console.log(`Stream ${i} is empty, skipping...`)
-            continue
-          }
-
-          // Parse the returned data with validation
-          const payer = streamData.nextString()
-          if (!payer || payer === "") {
-            console.log(`Stream ${i} has invalid payer, skipping...`)
-            continue
-          }
-
-          const payee = streamData.nextString()
-          if (!payee || payee === "") {
-            console.log(`Stream ${i} has invalid payee, skipping...`)
-            continue
-          }
-
-          const amount = streamData.nextString()
-          if (!amount || amount === "") {
-            console.log(`Stream ${i} has invalid amount, skipping...`)
-            continue
-          }
-
-          const interval = streamData.nextU64()
-
-          // The status and nextPaymentAt seem to be combined, let's handle this differently
-          const statusAndNextPayment = streamData.nextString()
-
-          // Split the combined string
-          const cleanStatus = statusAndNextPayment.replace(/\0/g, '').split(/\d+/)[0].trim()
-          const nextPaymentMatch = statusAndNextPayment.match(/\d+/)
-          const nextPaymentAt = nextPaymentMatch ? BigInt(nextPaymentMatch[0]) : BigInt(0)
-
-          // Validate the stream data
-          if (cleanStatus !== "active" && cleanStatus !== "paused" && cleanStatus !== "cancelled") {
-            console.log(`Stream ${i} has invalid status: ${cleanStatus}, skipping...`)
-            continue
-          }
-
-          // Create stream object
-          const streamInfo: Stream = {
-            id: i.toString(),
-            payer,
-            payee,
-            amount,
-            interval: Number(interval),
-            nextPayment: Number(nextPaymentAt),
-            status: cleanStatus as "active" | "paused" | "cancelled",
-            createdAt: Math.floor(Date.now() / 1000), // Using current time as fallback
-            totalPaid: "0", // This would need to be fetched separately
-            paymentsCount: 0, // This would need to be fetched separately
-          }
-
-          console.log(streamInfo)
-
-          allStreams.push(streamInfo)
-          console.log(`Fetched stream ${i}:`, streamInfo)
-        } catch (error) {
-          console.error(`Error fetching stream ${i}:`, error)
-          // Continue with next stream even if one fails
-        }
-      }
-
-      setStreams(allStreams)
-      console.log("All streams fetched:", allStreams)
-    } catch (error) {
-      console.error("Error fetching stream data:", error)
-      toast({
-        title: "Failed to Fetch Stream",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      })
-    } finally {
-      setIsFetching(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchStreamData()
-  }, [provider])
-  console.log(streams, "streams res")
 
   const formatAmount = (amount: string) => {
     return (Number.parseFloat(amount) / 1e9).toFixed(4)
@@ -227,7 +107,7 @@ export function StreamCard({ userRole, onUpdate, onViewDetails }: StreamCardProp
       })
 
       // Refresh stream data
-      await fetchStreamData()
+      await refetch()
       onUpdate?.()
     } catch (error) {
       console.error(`Error ${action}ing stream:`, error)
@@ -258,20 +138,25 @@ export function StreamCard({ userRole, onUpdate, onViewDetails }: StreamCardProp
 
   if (!streams || streams.length === 0) {
     return (
-      <Card className="w-full">
-        <CardContent className="flex items-center justify-center py-8">
-          <span className="text-muted-foreground">No streams available</span>
-        </CardContent>
-      </Card>
+      <div className="text-center py-12">
+        <ArrowUpRight className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+        <h3 className="text-lg font-semibold mb-2">No outgoing streams</h3>
+        <p className="text-muted-foreground mb-4">
+          Create your first payment stream to start sending recurring payments
+        </p>
+        <Button onClick={() => setShowCreateForm?.(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Create Stream
+        </Button>
+      </div>
     )
   }
 
   return (
     <div className="space-y-4">
       {streams.map((stream) => {
-        const isPayer = userRole === "payer"
-        const otherParty = isPayer ? stream.payee : stream.payer
-        const otherPartyLabel = isPayer ? "Recipient" : "Sender"
+        const otherParty = address == stream.payer ? stream.payee : stream.payer
+        const otherPartyLabel = address == stream.payee ? "Recipient" : "Sender"
 
         return (
           <Card key={stream.id} className="w-full">
@@ -364,7 +249,7 @@ export function StreamCard({ userRole, onUpdate, onViewDetails }: StreamCardProp
                     </Button>
                   )}
 
-                  {isPayer && stream.status === "active" && (
+                  {address == stream.payer && stream.status === "active" && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -375,7 +260,7 @@ export function StreamCard({ userRole, onUpdate, onViewDetails }: StreamCardProp
                     </Button>
                   )}
 
-                  {isPayer && stream.status === "paused" && (
+                  {address == stream.payer && stream.status === "paused" && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -386,7 +271,7 @@ export function StreamCard({ userRole, onUpdate, onViewDetails }: StreamCardProp
                     </Button>
                   )}
 
-                  {isPayer && stream.status !== "cancelled" && (
+                  {address == stream.payer && stream.status !== "cancelled" && (
                     <Button
                       variant="outline"
                       size="sm"

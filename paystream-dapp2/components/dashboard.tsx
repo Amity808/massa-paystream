@@ -16,6 +16,8 @@ import { useWallet } from "@/contexts/wallet-context"
 import { toast } from "@/hooks/use-toast"
 import { PAYSTREAM_CONTRACT_ADDRESS } from "@/contract"
 import { bytesToStr, SmartContract, JsonRpcProvider } from "@massalabs/massa-web3";
+import { StreamCardIncoming } from "./incoming-stream"
+import { useStreams } from "@/hooks/use-streams"
 
 
 export function Dashboard() {
@@ -27,6 +29,8 @@ export function Dashboard() {
   const [selectedStream, setSelectedStream] = useState<Stream | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
+      const { streams } = useStreams()
+
 
   const provider = JsonRpcProvider.buildnet();
   const payStreamContract = new SmartContract(provider, PAYSTREAM_CONTRACT_ADDRESS);
@@ -189,7 +193,7 @@ export function Dashboard() {
             <TrendingUp className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{streamLength}</div>
+            <div className="text-2xl font-bold">{streams.length}</div>
             <p className="text-xs text-muted-foreground">Streams on blockchain</p>
           </CardContent>
         </Card>
@@ -228,8 +232,8 @@ export function Dashboard() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="outgoing">My Streams ({payerStreams.length})</TabsTrigger>
-          <TabsTrigger value="incoming">Incoming ({payeeStreams.length})</TabsTrigger>
+          <TabsTrigger value="outgoing">My Streams ({streams.length})</TabsTrigger>
+          <TabsTrigger value="incoming">Incoming </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -243,38 +247,10 @@ export function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {isLoading ? (
-                  <div className="space-y-3">
-                    {[...Array(3)].map((_, i) => (
-                      <Skeleton key={i} className="h-20 w-full" />
-                    ))}
-                  </div>
-                ) : payerStreams.length > 0 ? (
-                  <div className="space-y-3">
-                    {payerStreams.slice(0, 3).map((stream) => (
-                      <StreamCard
-                        key={stream.id}
-                        stream={stream}
-                        userRole="payer"
-                        onUpdate={loadStreams}
-                        onViewDetails={setSelectedStream}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <ArrowUpRight className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No outgoing streams yet</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 bg-transparent"
-                      onClick={() => setShowCreateForm(true)}
-                    >
-                      Create your first stream
-                    </Button>
-                  </div>
-                )}
+              <StreamCard
+                      onUpdate={loadStreams}
+                      onViewDetails={setSelectedStream}
+                    />
               </CardContent>
             </Card>
 
@@ -287,38 +263,12 @@ export function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-              <StreamCard
-                      
-                      // stream={stream}
-                      userRole="payer"
+              <StreamCardIncoming
+                      setShowCreateForm={setShowCreateForm}
                       onUpdate={loadStreams}
                       onViewDetails={setSelectedStream}
                     />
-                {isLoading ? (
-                  <div className="space-y-3">
-                    {[...Array(3)].map((_, i) => (
-                      <Skeleton key={i} className="h-20 w-full" />
-                    ))}
-                  </div>
-                ) : payeeStreams.length > 0 ? (
-                  <div className="space-y-3">
-                    {payeeStreams.slice(0, 3).map((stream) => (
-                      <StreamCard
-                        key={stream.id}
-                        stream={stream}
-                        userRole="payee"
-                        onUpdate={loadStreams}
-                        onViewDetails={setSelectedStream}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <ArrowDownLeft className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>No incoming streams yet</p>
-                    <p className="text-sm">Streams will appear here when others send to you</p>
-                  </div>
-                )}
+            
               </CardContent>
             </Card>
           </div>
@@ -334,44 +284,14 @@ export function Dashboard() {
               <CardDescription>Streams where you are the payer</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[...Array(6)].map((_, i) => (
-                    <Skeleton key={i} className="h-64 w-full" />
-                  ))}
-                </div>
-              ) : payerStreams.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* {payerStreams.map((stream) => (
-                    <StreamCard
-                      key={stream.id}
-                      stream={stream}
-                      userRole="payer"
-                      onUpdate={loadStreams}
-                      onViewDetails={setSelectedStream}
-                    />
-                  ))} */}
+                  
                   <StreamCard
-                      
-                      // stream={stream}
-                      userRole="payer"
                       onUpdate={loadStreams}
                       onViewDetails={setSelectedStream}
                     />
                 </div>
-              ) : (
-                <div className="text-center py-12">
-                  <ArrowUpRight className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-semibold mb-2">No outgoing streams</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Create your first payment stream to start sending recurring payments
-                  </p>
-                  <Button onClick={() => setShowCreateForm(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Stream
-                  </Button>
-                </div>
-              )}
+              
             </CardContent>
           </Card>
         </TabsContent>
@@ -386,37 +306,11 @@ export function Dashboard() {
               <CardDescription>Streams where you are the recipient</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[...Array(6)].map((_, i) => (
-                    <Skeleton key={i} className="h-64 w-full" />
-                  ))}
-                </div>
-              ) : payeeStreams.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {payeeStreams.map((stream) => (
-                    <StreamCard
-                      key={stream.id}
-                      stream={stream}
-                      userRole="payee"
+            <StreamCardIncoming
+                      setShowCreateForm={setShowCreateForm}
                       onUpdate={loadStreams}
                       onViewDetails={setSelectedStream}
                     />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <ArrowDownLeft className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-semibold mb-2">No incoming streams</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Incoming payment streams will appear here when others create streams to your address
-                  </p>
-                  <div className="bg-muted p-4 rounded-lg max-w-md mx-auto">
-                    <p className="text-sm text-muted-foreground mb-2">Your address:</p>
-                    <code className="text-xs bg-background px-2 py-1 rounded border">{address}</code>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>

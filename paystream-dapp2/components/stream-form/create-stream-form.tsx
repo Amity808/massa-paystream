@@ -96,13 +96,11 @@ export function CreateStreamForm({ onSuccess }: CreateStreamFormProps) {
 
             // Prepare arguments for createStream function
             const args = new Args()
-                .addString(streamId.toString())
                 .addString(formData.payee)
                 .addU64(BigInt(amountInNanoMAS))
                 .addU64(BigInt(intervalValue))
 
             console.log("Creating stream with params:", {
-                streamId,
                 payee: formData.payee,
                 amount: amountInNanoMAS,
                 interval: intervalValue,

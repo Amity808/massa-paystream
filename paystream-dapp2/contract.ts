@@ -1,1 +1,1 @@
-export const PAYSTREAM_CONTRACT_ADDRESS = "AS1v9uvjX6FeFaUhhC39Righz1vDeSYxmawxA2qQ9BYLYN6PGHtx";
+export const PAYSTREAM_CONTRACT_ADDRESS = "AS12SSapyf37tsZWgYH6zxSQbhyrsiXaJaje2QSkg6hMqHpvaMpsm";

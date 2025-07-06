@@ -49,17 +49,16 @@ const STATUS_CANCELED = 'canceled';
 export function createStream(binaryArgs: StaticArray<u8>): void {
 
   const streamLength = Storage.get(STREAM_LENGTH_KEY);
-  const streamIds = streamLength + 1;
+  const streamIds = (parseInt(streamLength) + 1).toString();
   const args = new Args(binaryArgs);
-  
-  const streamId = args.nextString().expect('streamId is missing');
+
   const payer = Context.caller();
   const payee = args.nextString().expect('payee is missing');
   const amount = args.nextU64().expect('amount is missing');
   const interval = args.nextU64().expect('interval is missing');
   const now = Context.timestamp();
 
-  assert(!Storage.has(key(streamId, "payer")), 'Stream already exists');
+  assert(!Storage.has(key(streamIds, "payer")), 'Stream already exists');
 
   Storage.set(key(streamIds, "payer"), payer.toString());
   Storage.set(key(streamIds, "payee"), payee);
@@ -68,6 +67,10 @@ export function createStream(binaryArgs: StaticArray<u8>): void {
   Storage.set(key(streamIds, "amount"), amount.toString());
   Storage.set(key(streamIds, "createdAt"), now.toString());
   Storage.set(key(streamIds, "nextPaymentAt"), (now + interval).toString());
+
+  // Update the stream length counter
+  Storage.set(STREAM_LENGTH_KEY, streamIds);
+
   generateEvent(`Stream created: ${streamIds}`);
 }
 
@@ -149,6 +152,12 @@ export function cancelStream(binaryArgs: StaticArray<u8>): void {
 export function getStreamInfo(binaryArgs: StaticArray<u8>): StaticArray<u8> {
   const args = new Args(binaryArgs);
   const streamId = args.nextString().expect('streamId is missing');
+
+  // Check if the stream exists
+  if (!Storage.has(key(streamId, "payer"))) {
+    // Return empty data if stream doesn't exist
+    return new Args().serialize();
+  }
 
   const payer = Storage.get(key(streamId, "payer"));
   const payee = Storage.get(key(streamId, "payee"));
