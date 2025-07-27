@@ -13,6 +13,7 @@
     "@assemblyscript/loader": "^0.27.29",
     "@hookform/resolvers": "^3.9.1",
     "@massalabs/as-types": "^2.0.0",
+    "@massalabs/deweb-cli": "^0.6.0",
     "@massalabs/eslint-config": "^0.0.11",
     "@massalabs/massa-as-sdk": "^3.0.2",
     "@massalabs/massa-sc-compiler": "^0.2.1-dev",
