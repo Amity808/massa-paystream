@@ -374,4 +374,311 @@ export class CarbonCreditContract {
       }
     }
   }
+
+  // =====================================================================
+  // EMISSIONS TRACKING FUNCTIONS
+  // =====================================================================
+
+  async recordEmissions(
+    emissionAmount: number,
+    scope: string,
+    emissionSource: string,
+    reportingPeriod: number
+  ): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args()
+        .addU64(BigInt(emissionAmount))
+        .addString(scope)
+        .addString(emissionSource)
+        .addU64(BigInt(reportingPeriod))
+
+      const result = await this.contract.call('recordEmissions', args, { coins: BigInt(100000000) })
+
+      return {
+        success: true,
+        txHash: result.id,
+        data: { emissionAmount, scope, emissionSource, reportingPeriod }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to record emissions'
+      }
+    }
+  }
+
+  async getEmissionRecord(recordId: number): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args().addU64(BigInt(recordId))
+      const result = await this.contract.read('getEmissionRecord', args)
+      const emissionData = bytesToStr(result.value)
+
+      // Parse the pipe-separated data
+      const parts = emissionData.split('|')
+      const emission = {
+        companyAddress: parts[0],
+        emissionAmount: parts[1],
+        reportingPeriod: parts[2],
+        scope: parts[3],
+        emissionSource: parts[4],
+        timestamp: parts[5],
+        isVerified: parts[6] === 'true',
+        verifiedBy: parts[7] || null
+      }
+
+      return {
+        success: true,
+        data: emission
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Emission record not found'
+      }
+    }
+  }
+
+  // =====================================================================
+  // CARBON CREDIT FUNCTIONS
+  // =====================================================================
+
+  async mintCarbonCredits(
+    projectId: string,
+    tonnageCO2: number,
+    vintage: number,
+    creditType: string,
+    price: number,
+    verificationStandard: string,
+    quantity: number
+  ): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args()
+        .addString(projectId)
+        .addU64(BigInt(tonnageCO2))
+        .addU64(BigInt(vintage))
+        .addString(creditType)
+        .addU64(BigInt(price))
+        .addString(verificationStandard)
+        .addU64(BigInt(quantity))
+
+      const result = await this.contract.call('mintCarbonCredits', args, { coins: BigInt(100000000) })
+
+      return {
+        success: true,
+        txHash: result.id,
+        data: { projectId, tonnageCO2, vintage, creditType, price, verificationStandard, quantity }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to mint carbon credits'
+      }
+    }
+  }
+
+  async transferCredits(to: string, creditIds: string[]): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args()
+        .addString(to)
+        .addString(creditIds.join(','))
+
+      const result = await this.contract.call('transferCredits', args, { coins: BigInt(10000000) })
+
+      return {
+        success: true,
+        txHash: result.id,
+        data: { to, creditIds }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to transfer credits'
+      }
+    }
+  }
+
+  async retireCredits(creditIds: string[], retirementReason: string): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args()
+        .addString(creditIds.join(','))
+        .addString(retirementReason)
+
+      const result = await this.contract.call('retireCredits', args, { coins: BigInt(10000000) })
+
+      return {
+        success: true,
+        txHash: result.id,
+        data: { creditIds, retirementReason }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to retire credits'
+      }
+    }
+  }
+
+  async getCreditDetails(creditId: number): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args().addU64(BigInt(creditId))
+      const result = await this.contract.read('getCreditDetails', args)
+      const creditData = bytesToStr(result.value)
+
+      // Parse the pipe-separated data
+      const parts = creditData.split('|')
+      const credit = {
+        tonnageCO2: parts[0],
+        projectId: parts[1],
+        issuer: parts[2],
+        vintage: parts[3],
+        creditType: parts[4],
+        price: parts[5],
+        isRetired: parts[6] === 'true',
+        creationDate: parts[7],
+        verificationStandard: parts[8],
+        currentOwner: parts[9],
+        retiredBy: parts[10] || null,
+        retirementReason: parts[11] || null
+      }
+
+      return {
+        success: true,
+        data: credit
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Credit not found'
+      }
+    }
+  }
+
+  // =====================================================================
+  // MARKETPLACE FUNCTIONS
+  // =====================================================================
+
+  async purchaseCredits(
+    creditIds: string[],
+    maxTotalPrice: number,
+    purpose: string
+  ): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args()
+        .addString(creditIds.join(','))
+        .addU64(BigInt(maxTotalPrice))
+        .addString(purpose)
+
+      const result = await this.contract.call('purchaseCredits', args, { coins: BigInt(100000000) })
+
+      return {
+        success: true,
+        txHash: result.id,
+        data: { creditIds, maxTotalPrice, purpose }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to purchase credits'
+      }
+    }
+  }
+
+  async getTransactionDetails(transactionId: number): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args().addU64(BigInt(transactionId))
+      const result = await this.contract.read('getTransactionDetails', args)
+      const transactionData = bytesToStr(result.value)
+
+      // Parse the pipe-separated data
+      const parts = transactionData.split('|')
+      const transaction = {
+        buyer: parts[0],
+        seller: parts[1],
+        projectId: parts[2],
+        creditIds: parts[3],
+        totalTonnage: parts[4],
+        totalPrice: parts[5],
+        timestamp: parts[6],
+        purpose: parts[7]
+      }
+
+      return {
+        success: true,
+        data: transaction
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Transaction not found'
+      }
+    }
+  }
+
+  // =====================================================================
+  // CERTIFICATE FUNCTIONS
+  // =====================================================================
+
+  async generateOffsetCertificate(
+    transactionId: number,
+    certificateType: string
+  ): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args()
+        .addU64(BigInt(transactionId))
+        .addString(certificateType)
+
+      const result = await this.contract.call('generateOffsetCertificate', args, { coins: BigInt(10000000) })
+
+      return {
+        success: true,
+        txHash: result.id,
+        data: { transactionId, certificateType }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate certificate'
+      }
+    }
+  }
+
+  // =====================================================================
+  // COMPANY MANAGEMENT FUNCTIONS
+  // =====================================================================
+
+  async updateCompanyEmissions(newAnnualEmissions: number): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args().addU64(BigInt(newAnnualEmissions))
+      const result = await this.contract.call('updateCompanyEmissions', args, { coins: BigInt(10000000) })
+
+      return {
+        success: true,
+        txHash: result.id,
+        data: { newAnnualEmissions }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update company emissions'
+      }
+    }
+  }
+
+  async setComplianceTarget(offsetTarget: number): Promise<ContractInteractionResult> {
+    try {
+      const args = new Args().addU64(BigInt(offsetTarget))
+      const result = await this.contract.call('setComplianceTarget', args, { coins: BigInt(10000000) })
+
+      return {
+        success: true,
+        txHash: result.id,
+        data: { offsetTarget }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to set compliance target'
+      }
+    }
+  }
 }

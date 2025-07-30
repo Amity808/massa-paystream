@@ -1,166 +1,440 @@
 // app/marketplace/page.tsx
 "use client"
 
-import { useEffect, useState } from "react"
-import CreditCard from "@/components/dashboard/credit-card"
-import { useContract } from "@/hooks/use-contract"
-import type { CarbonCredit } from "@/lib/types"
-import { Loader2, Leaf } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
-import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
+import { useContract } from "@/hooks/use-contract"
+import { useUser } from "@/contexts/user-context"
+import { Loader2, Search, Filter, ShoppingCart, Leaf, DollarSign, Calendar } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
-export default function PublicMarketplacePage() {
-  const { getAllAvailableCredits, loading, error } = useContract()
-  const [availableCredits, setAvailableCredits] = useState<CarbonCredit[]>([])
-  const [filteredCredits, setFilteredCredits] = useState<CarbonCredit[]>([])
+interface CreditListing {
+  id: string
+  projectId: string
+  projectName: string
+  projectType: string
+  location: string
+  amount: number // tons CO2e
+  pricePerTon: number
+  vintageYear: number
+  verificationStandard: string
+  issuer: string
+  status: "available" | "sold" | "retired"
+  description: string
+}
+
+export default function MarketplacePage() {
+  const { currentAddress, userRole } = useUser()
+  const { purchaseCredits, getCreditDetails, isLoading } = useContract()
+  const [credits, setCredits] = useState<CreditListing[]>([])
+  const [filteredCredits, setFilteredCredits] = useState<CreditListing[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterVintage, setFilterVintage] = useState("")
-
-  const fetchCredits = async () => {
-    const credits = await getAllAvailableCredits()
-    if (credits) {
-      setAvailableCredits(credits)
-      setFilteredCredits(credits)
-    }
-  }
+  const [selectedType, setSelectedType] = useState("all")
+  const [selectedLocation, setSelectedLocation] = useState("all")
+  const [priceRange, setPriceRange] = useState("all")
+  const [selectedCredits, setSelectedCredits] = useState<string[]>([])
+  const [isPurchasing, setIsPurchasing] = useState(false)
 
   useEffect(() => {
+    const fetchCredits = async () => {
+      // Mock data for now - in real implementation, fetch from smart contract
+      const mockCredits: CreditListing[] = [
+        {
+          id: "1",
+          projectId: "PROJ001",
+          projectName: "Amazon Reforestation",
+          projectType: "reforestation",
+          location: "Brazil",
+          amount: 500,
+          pricePerTon: 25,
+          vintageYear: 2023,
+          verificationStandard: "VCS",
+          issuer: "0x123...",
+          status: "available",
+          description: "Large-scale reforestation project in the Amazon rainforest"
+        },
+        {
+          id: "2",
+          projectId: "PROJ002",
+          projectName: "Solar Farm Development",
+          projectType: "renewable-energy",
+          location: "India",
+          amount: 300,
+          pricePerTon: 30,
+          vintageYear: 2023,
+          verificationStandard: "Gold Standard",
+          issuer: "0x456...",
+          status: "available",
+          description: "Solar energy project replacing coal-fired power plants"
+        },
+        {
+          id: "3",
+          projectId: "PROJ003",
+          projectName: "Methane Capture",
+          projectType: "methane-capture",
+          location: "United States",
+          amount: 200,
+          pricePerTon: 35,
+          vintageYear: 2022,
+          verificationStandard: "VCS",
+          issuer: "0x789...",
+          status: "available",
+          description: "Landfill methane capture and utilization project"
+        }
+      ]
+
+      setCredits(mockCredits)
+      setFilteredCredits(mockCredits)
+    }
+
     fetchCredits()
   }, [])
 
   useEffect(() => {
-    let currentCredits = availableCredits
+    let filtered = credits.filter(credit => credit.status === "available")
 
     if (searchTerm) {
-      currentCredits = currentCredits.filter(
-        (credit) =>
-          credit.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          credit.projectId.toLowerCase().includes(searchTerm.toLowerCase()),
+      filtered = filtered.filter(credit =>
+        credit.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        credit.location.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
-    if (filterVintage && filterVintage !== "all") {
-      currentCredits = currentCredits.filter((credit) => credit.vintageYear === Number.parseInt(filterVintage))
+    if (selectedType !== "all") {
+      filtered = filtered.filter(credit => credit.projectType === selectedType)
     }
 
-    setFilteredCredits(currentCredits)
-  }, [searchTerm, filterVintage, availableCredits])
+    if (selectedLocation !== "all") {
+      filtered = filtered.filter(credit => credit.location === selectedLocation)
+    }
 
-  const uniqueVintageYears = Array.from(new Set(availableCredits.map((c) => c.vintageYear))).sort((a, b) => b - a)
+    if (priceRange !== "all") {
+      const [min, max] = priceRange.split("-").map(Number)
+      filtered = filtered.filter(credit => {
+        if (max) {
+          return credit.pricePerTon >= min && credit.pricePerTon <= max
+        }
+        return credit.pricePerTon >= min
+      })
+    }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[calc(100vh-60px)]">
-        <Loader2 className="h-10 w-10 animate-spin text-green-500" />
-        <p className="ml-4 text-lg">Loading marketplace...</p>
-      </div>
+    setFilteredCredits(filtered)
+  }, [credits, searchTerm, selectedType, selectedLocation, priceRange])
+
+  const handleCreditSelection = (creditId: string) => {
+    setSelectedCredits(prev =>
+      prev.includes(creditId)
+        ? prev.filter(id => id !== creditId)
+        : [...prev, creditId]
     )
   }
 
-  if (error) {
-    return <div className="text-error text-center py-8">Error: {error}</div>
+  const handlePurchase = async () => {
+    if (selectedCredits.length === 0) {
+      toast({
+        title: "No Credits Selected",
+        description: "Please select credits to purchase",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!currentAddress) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to purchase credits",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsPurchasing(true)
+    try {
+      const selectedCreditData = filteredCredits.filter(credit =>
+        selectedCredits.includes(credit.id)
+      )
+
+      const totalPrice = selectedCreditData.reduce((sum, credit) =>
+        sum + (credit.amount * credit.pricePerTon), 0
+      )
+
+      const result = await purchaseCredits(
+        selectedCredits,
+        totalPrice,
+        "ESG compliance and carbon neutrality"
+      )
+
+      if (result.success) {
+        toast({
+          title: "Purchase Successful",
+          description: `Successfully purchased ${selectedCredits.length} credit(s)`,
+        })
+        setSelectedCredits([])
+        // Refresh credits list
+      } else {
+        toast({
+          title: "Purchase Failed",
+          description: result.error || "Failed to purchase credits",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Purchase Failed",
+        description: "An error occurred during purchase",
+        variant: "destructive",
+      })
+    } finally {
+      setIsPurchasing(false)
+    }
+  }
+
+  const getProjectTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      "reforestation": "Reforestation",
+      "renewable-energy": "Renewable Energy",
+      "energy-efficiency": "Energy Efficiency",
+      "methane-capture": "Methane Capture",
+      "soil-carbon": "Soil Carbon",
+      "blue-carbon": "Blue Carbon",
+      "biochar": "Biochar",
+      "direct-air-capture": "Direct Air Capture"
+    }
+    return labels[type] || type
+  }
+
+  const getVerificationBadgeColor = (standard: string) => {
+    const colors: Record<string, string> = {
+      "VCS": "bg-green-100 text-green-800",
+      "Gold Standard": "bg-yellow-100 text-yellow-800",
+      "CCB": "bg-blue-100 text-blue-800"
+    }
+    return colors[standard] || "bg-gray-100 text-gray-800"
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="container mx-auto px-4 py-8 space-y-8">
       {/* Header */}
-      <header className="px-4 lg:px-6 h-14 flex items-center justify-between bg-white dark:bg-gray-900 shadow-sm">
-        <Link href="/" className="flex items-center gap-2 font-bold text-green-500 text-lg">
-          <Leaf className="h-6 w-6" />
-          <span>CarbonCredit.io</span>
-        </Link>
-        <nav className="hidden md:flex gap-4 sm:gap-6">
-          <Link
-            href="/#features"
-            className="text-sm font-medium hover:underline underline-offset-4 text-gray-700 dark:text-gray-300"
-          >
-            Features
-          </Link>
-          <Link
-            href="/#stats"
-            className="text-sm font-medium hover:underline underline-offset-4 text-gray-700 dark:text-gray-300"
-          >
-            Statistics
-          </Link>
-          <Link href="/marketplace" className="text-sm font-medium hover:underline underline-offset-4 text-green-500">
-            Marketplace
-          </Link>
-          <Link
-            href="/dashboard/company"
-            className="text-sm font-medium hover:underline underline-offset-4 text-gray-700 dark:text-gray-300"
-          >
-            Dashboard
-          </Link>
-        </nav>
-        <Link href="/(auth)">
-          <Button className="bg-green-500 hover:bg-green-600 text-white">Connect Wallet</Button>
-        </Link>
-      </header>
-
-      <main className="flex-1 container mx-auto px-4 py-8 md:px-6 md:py-12">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">Public Carbon Credit Marketplace</h1>
-        <p className="text-gray-600 dark:text-gray-400 mb-8">
-          Browse available carbon credits from verified projects worldwide. Connect your wallet and register as a
-          company to purchase.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <Input
-            placeholder="Search by project or description..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-grow"
-          />
-          <Select value={filterVintage} onValueChange={setFilterVintage}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by Vintage" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Vintages</SelectItem>
-              {uniqueVintageYears.map((year) => (
-                <SelectItem key={year} value={String(year)}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            onClick={() => {
-              setSearchTerm("")
-              setFilterVintage("all")
-            }}
-          >
-            Clear Filters
-          </Button>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Carbon Credit Marketplace</h1>
+          <p className="text-muted-foreground">Purchase verified carbon credits to offset your emissions</p>
         </div>
-
-        {filteredCredits.length === 0 ? (
-          <div className="text-center text-muted-foreground py-8">
-            No available carbon credits matching your criteria.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredCredits.map((credit) => (
-              <CreditCard key={credit.id} credit={credit} showActions={false} />
-            ))}
-          </div>
+        {selectedCredits.length > 0 && (
+          <Button onClick={handlePurchase} disabled={isPurchasing}>
+            {isPurchasing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Purchasing...
+              </>
+            ) : (
+              <>
+                <ShoppingCart className="w-4 h-4 mr-2" />
+                Purchase {selectedCredits.length} Credit(s)
+              </>
+            )}
+          </Button>
         )}
-      </main>
+      </div>
 
-      {/* Footer */}
-      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400">
-        <p className="text-xs">&copy; 2024 CarbonCredit.io. All rights reserved.</p>
-        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <Link href="#" className="text-xs hover:underline underline-offset-4">
-            Terms of Service
-          </Link>
-          <Link href="#" className="text-xs hover:underline underline-offset-4">
-            Privacy
-          </Link>
-        </nav>
-      </footer>
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="w-5 h-5" />
+            Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-sm font-medium">Search</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search projects..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Project Type</label>
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="reforestation">Reforestation</SelectItem>
+                  <SelectItem value="renewable-energy">Renewable Energy</SelectItem>
+                  <SelectItem value="energy-efficiency">Energy Efficiency</SelectItem>
+                  <SelectItem value="methane-capture">Methane Capture</SelectItem>
+                  <SelectItem value="soil-carbon">Soil Carbon</SelectItem>
+                  <SelectItem value="blue-carbon">Blue Carbon</SelectItem>
+                  <SelectItem value="biochar">Biochar</SelectItem>
+                  <SelectItem value="direct-air-capture">Direct Air Capture</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Location</label>
+              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All locations" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  <SelectItem value="Brazil">Brazil</SelectItem>
+                  <SelectItem value="India">India</SelectItem>
+                  <SelectItem value="United States">United States</SelectItem>
+                  <SelectItem value="Kenya">Kenya</SelectItem>
+                  <SelectItem value="Indonesia">Indonesia</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Price Range</label>
+              <Select value={priceRange} onValueChange={setPriceRange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All prices" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Prices</SelectItem>
+                  <SelectItem value="0-20">$0 - $20</SelectItem>
+                  <SelectItem value="20-40">$20 - $40</SelectItem>
+                  <SelectItem value="40-60">$40 - $60</SelectItem>
+                  <SelectItem value="60-">$60+</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredCredits.map((credit) => (
+          <Card
+            key={credit.id}
+            className={`cursor-pointer transition-all ${selectedCredits.includes(credit.id)
+                ? 'ring-2 ring-green-500 bg-green-50 dark:bg-green-950'
+                : 'hover:shadow-lg'
+              }`}
+            onClick={() => handleCreditSelection(credit.id)}
+          >
+            <CardHeader>
+              <div className="flex items-start justify-between">
+                <div>
+                  <CardTitle className="text-lg">{credit.projectName}</CardTitle>
+                  <p className="text-sm text-muted-foreground">{credit.location}</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={selectedCredits.includes(credit.id)}
+                  onChange={() => handleCreditSelection(credit.id)}
+                  className="w-4 h-4 text-green-600"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Project Type</span>
+                <Badge variant="outline">{getProjectTypeLabel(credit.projectType)}</Badge>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Available Credits</span>
+                <span className="font-semibold">{credit.amount.toLocaleString()} tons</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Price per Ton</span>
+                <span className="font-semibold text-green-600">${credit.pricePerTon}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Vintage Year</span>
+                <span className="font-semibold">{credit.vintageYear}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Verification</span>
+                <Badge className={getVerificationBadgeColor(credit.verificationStandard)}>
+                  {credit.verificationStandard}
+                </Badge>
+              </div>
+
+              <div className="pt-2 border-t">
+                <p className="text-sm text-muted-foreground line-clamp-2">
+                  {credit.description}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-sm text-muted-foreground">Total Value</span>
+                <span className="font-bold text-lg">
+                  ${(credit.amount * credit.pricePerTon).toLocaleString()}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {filteredCredits.length === 0 && (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Leaf className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold mb-2">No Credits Found</h3>
+            <p className="text-muted-foreground">
+              Try adjusting your filters to find available carbon credits.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Summary */}
+      {selectedCredits.length > 0 && (
+        <Card className="sticky bottom-4">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold">
+                  {selectedCredits.length} credit(s) selected
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Total: ${filteredCredits
+                    .filter(credit => selectedCredits.includes(credit.id))
+                    .reduce((sum, credit) => sum + (credit.amount * credit.pricePerTon), 0)
+                    .toLocaleString()}
+                </p>
+              </div>
+              <Button onClick={handlePurchase} disabled={isPurchasing}>
+                {isPurchasing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Purchasing...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    Purchase Credits
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

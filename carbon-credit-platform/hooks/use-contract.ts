@@ -45,7 +45,7 @@ export function useContract() {
     try {
       const role = await contract.checkUserRole(address)
       console.log("detectUserRole: Contract returned role:", role)
-      
+
       if (role) {
         console.log("detectUserRole: Setting user role to:", role)
         setUserRole(role)
@@ -457,6 +457,422 @@ export function useContract() {
     }
   }, [contract])
 
+  // =====================================================================
+  // EMISSIONS TRACKING FUNCTIONS
+  // =====================================================================
+
+  const recordEmissions = useCallback(async (
+    emissionAmount: number,
+    scope: string,
+    emissionSource: string,
+    reportingPeriod: number
+  ): Promise<ContractInteractionResult> => {
+    if (!contract) {
+      return { success: false, error: "Contract not initialized" }
+    }
+
+    setIsLoading(true)
+    try {
+      const result = await contract.recordEmissions(emissionAmount, scope, emissionSource, reportingPeriod)
+
+      if (result.success) {
+        toast({
+          title: "Emissions Recorded",
+          description: `${emissionAmount} tons of CO2e emissions have been recorded successfully.`,
+        })
+      } else {
+        toast({
+          title: "Recording Failed",
+          description: result.error || "Failed to record emissions",
+          variant: "destructive",
+        })
+      }
+
+      return result
+    } catch (error) {
+      const errorResult = {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      }
+
+      toast({
+        title: "Recording Failed",
+        description: errorResult.error,
+        variant: "destructive",
+      })
+
+      return errorResult
+    } finally {
+      setIsLoading(false)
+    }
+  }, [contract])
+
+  const getEmissionRecord = useCallback(async (recordId: number) => {
+    if (!contract) return null
+
+    try {
+      const result = await contract.getEmissionRecord(recordId)
+      return result.success ? result.data : null
+    } catch (error) {
+      console.error('Error fetching emission record:', error)
+      return null
+    }
+  }, [contract])
+
+  // =====================================================================
+  // CARBON CREDIT FUNCTIONS
+  // =====================================================================
+
+  const mintCarbonCredits = useCallback(async (
+    projectId: string,
+    tonnageCO2: number,
+    vintage: number,
+    creditType: string,
+    price: number,
+    verificationStandard: string,
+    quantity: number
+  ): Promise<ContractInteractionResult> => {
+    if (!contract) {
+      return { success: false, error: "Contract not initialized" }
+    }
+
+    setIsLoading(true)
+    try {
+      const result = await contract.mintCarbonCredits(
+        projectId, tonnageCO2, vintage, creditType, price, verificationStandard, quantity
+      )
+
+      if (result.success) {
+        toast({
+          title: "Credits Minted",
+          description: `${quantity} carbon credits have been minted successfully.`,
+        })
+      } else {
+        toast({
+          title: "Minting Failed",
+          description: result.error || "Failed to mint credits",
+          variant: "destructive",
+        })
+      }
+
+      return result
+    } catch (error) {
+      const errorResult = {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      }
+
+      toast({
+        title: "Minting Failed",
+        description: errorResult.error,
+        variant: "destructive",
+      })
+
+      return errorResult
+    } finally {
+      setIsLoading(false)
+    }
+  }, [contract])
+
+  const transferCredits = useCallback(async (
+    to: string,
+    creditIds: string[]
+  ): Promise<ContractInteractionResult> => {
+    if (!contract) {
+      return { success: false, error: "Contract not initialized" }
+    }
+
+    setIsLoading(true)
+    try {
+      const result = await contract.transferCredits(to, creditIds)
+
+      if (result.success) {
+        toast({
+          title: "Credits Transferred",
+          description: `${creditIds.length} credits have been transferred successfully.`,
+        })
+      } else {
+        toast({
+          title: "Transfer Failed",
+          description: result.error || "Failed to transfer credits",
+          variant: "destructive",
+        })
+      }
+
+      return result
+    } catch (error) {
+      const errorResult = {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      }
+
+      toast({
+        title: "Transfer Failed",
+        description: errorResult.error,
+        variant: "destructive",
+      })
+
+      return errorResult
+    } finally {
+      setIsLoading(false)
+    }
+  }, [contract])
+
+  const retireCredits = useCallback(async (
+    creditIds: string[],
+    retirementReason: string
+  ): Promise<ContractInteractionResult> => {
+    if (!contract) {
+      return { success: false, error: "Contract not initialized" }
+    }
+
+    setIsLoading(true)
+    try {
+      const result = await contract.retireCredits(creditIds, retirementReason)
+
+      if (result.success) {
+        toast({
+          title: "Credits Retired",
+          description: `${creditIds.length} credits have been retired successfully.`,
+        })
+      } else {
+        toast({
+          title: "Retirement Failed",
+          description: result.error || "Failed to retire credits",
+          variant: "destructive",
+        })
+      }
+
+      return result
+    } catch (error) {
+      const errorResult = {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      }
+
+      toast({
+        title: "Retirement Failed",
+        description: errorResult.error,
+        variant: "destructive",
+      })
+
+      return errorResult
+    } finally {
+      setIsLoading(false)
+    }
+  }, [contract])
+
+  const getCreditDetails = useCallback(async (creditId: number) => {
+    if (!contract) return null
+
+    try {
+      const result = await contract.getCreditDetails(creditId)
+      return result.success ? result.data : null
+    } catch (error) {
+      console.error('Error fetching credit details:', error)
+      return null
+    }
+  }, [contract])
+
+  // =====================================================================
+  // MARKETPLACE FUNCTIONS
+  // =====================================================================
+
+  const purchaseCredits = useCallback(async (
+    creditIds: string[],
+    maxTotalPrice: number,
+    purpose: string
+  ): Promise<ContractInteractionResult> => {
+    if (!contract) {
+      return { success: false, error: "Contract not initialized" }
+    }
+
+    setIsLoading(true)
+    try {
+      const result = await contract.purchaseCredits(creditIds, maxTotalPrice, purpose)
+
+      if (result.success) {
+        toast({
+          title: "Credits Purchased",
+          description: `${creditIds.length} credits have been purchased successfully.`,
+        })
+      } else {
+        toast({
+          title: "Purchase Failed",
+          description: result.error || "Failed to purchase credits",
+          variant: "destructive",
+        })
+      }
+
+      return result
+    } catch (error) {
+      const errorResult = {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      }
+
+      toast({
+        title: "Purchase Failed",
+        description: errorResult.error,
+        variant: "destructive",
+      })
+
+      return errorResult
+    } finally {
+      setIsLoading(false)
+    }
+  }, [contract])
+
+  const getTransactionDetails = useCallback(async (transactionId: number) => {
+    if (!contract) return null
+
+    try {
+      const result = await contract.getTransactionDetails(transactionId)
+      return result.success ? result.data : null
+    } catch (error) {
+      console.error('Error fetching transaction details:', error)
+      return null
+    }
+  }, [contract])
+
+  // =====================================================================
+  // CERTIFICATE FUNCTIONS
+  // =====================================================================
+
+  const generateOffsetCertificate = useCallback(async (
+    transactionId: number,
+    certificateType: string
+  ): Promise<ContractInteractionResult> => {
+    if (!contract) {
+      return { success: false, error: "Contract not initialized" }
+    }
+
+    setIsLoading(true)
+    try {
+      const result = await contract.generateOffsetCertificate(transactionId, certificateType)
+
+      if (result.success) {
+        toast({
+          title: "Certificate Generated",
+          description: "Offset certificate has been generated successfully.",
+        })
+      } else {
+        toast({
+          title: "Certificate Generation Failed",
+          description: result.error || "Failed to generate certificate",
+          variant: "destructive",
+        })
+      }
+
+      return result
+    } catch (error) {
+      const errorResult = {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      }
+
+      toast({
+        title: "Certificate Generation Failed",
+        description: errorResult.error,
+        variant: "destructive",
+      })
+
+      return errorResult
+    } finally {
+      setIsLoading(false)
+    }
+  }, [contract])
+
+  // =====================================================================
+  // COMPANY MANAGEMENT FUNCTIONS
+  // =====================================================================
+
+  const updateCompanyEmissions = useCallback(async (
+    newAnnualEmissions: number
+  ): Promise<ContractInteractionResult> => {
+    if (!contract) {
+      return { success: false, error: "Contract not initialized" }
+    }
+
+    setIsLoading(true)
+    try {
+      const result = await contract.updateCompanyEmissions(newAnnualEmissions)
+
+      if (result.success) {
+        toast({
+          title: "Emissions Updated",
+          description: "Company emissions have been updated successfully.",
+        })
+      } else {
+        toast({
+          title: "Update Failed",
+          description: result.error || "Failed to update emissions",
+          variant: "destructive",
+        })
+      }
+
+      return result
+    } catch (error) {
+      const errorResult = {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      }
+
+      toast({
+        title: "Update Failed",
+        description: errorResult.error,
+        variant: "destructive",
+      })
+
+      return errorResult
+    } finally {
+      setIsLoading(false)
+    }
+  }, [contract])
+
+  const setComplianceTarget = useCallback(async (
+    offsetTarget: number
+  ): Promise<ContractInteractionResult> => {
+    if (!contract) {
+      return { success: false, error: "Contract not initialized" }
+    }
+
+    setIsLoading(true)
+    try {
+      const result = await contract.setComplianceTarget(offsetTarget)
+
+      if (result.success) {
+        toast({
+          title: "Compliance Target Set",
+          description: "Compliance target has been set successfully.",
+        })
+      } else {
+        toast({
+          title: "Setting Failed",
+          description: result.error || "Failed to set compliance target",
+          variant: "destructive",
+        })
+      }
+
+      return result
+    } catch (error) {
+      const errorResult = {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      }
+
+      toast({
+        title: "Setting Failed",
+        description: errorResult.error,
+        variant: "destructive",
+      })
+
+      return errorResult
+    } finally {
+      setIsLoading(false)
+    }
+  }, [contract])
+
   return {
     contract,
     isLoading,
@@ -480,5 +896,26 @@ export function useContract() {
     getProjectDetails,
     getMyCompanyDashboard,
     getPlatformStats,
+
+    // Emissions tracking
+    recordEmissions,
+    getEmissionRecord,
+
+    // Carbon credit functions
+    mintCarbonCredits,
+    transferCredits,
+    retireCredits,
+    getCreditDetails,
+
+    // Marketplace functions
+    purchaseCredits,
+    getTransactionDetails,
+
+    // Certificate functions
+    generateOffsetCertificate,
+
+    // Company management
+    updateCompanyEmissions,
+    setComplianceTarget,
   }
 }

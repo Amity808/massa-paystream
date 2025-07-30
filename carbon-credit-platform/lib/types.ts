@@ -23,6 +23,7 @@ export interface EmissionRecord {
   scope3: number // Other indirect emissions
   total: number
   verified: boolean
+  verifiedBy?: string | null
 }
 
 export interface Project {
